@@ -135,8 +135,7 @@ static void *poll_and_apply(void *arg) {
                 }
             }
         });
-        usleep(50 * 1000); // 50ms -- tight enough that a reset is corrected
-                            // well within one visible frame's worth of drift
+        sleep(1);
     }
     return NULL;
 }
