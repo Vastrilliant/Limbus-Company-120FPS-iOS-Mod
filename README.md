@@ -4,9 +4,8 @@ Force Limbus to run at 120FPS using CADisplayLink
 .dylib can be found in Actions
 
 ## Requirements 
-Decrypted .ipa of LimbusCompany 
-Sideloading service that supports .dylib injection
-or LiveContainer's TweakLoader
+1. Decrypted .ipa of LimbusCompany 
+2. Sideloading service that supports .dylib injection or LiveContainer's TweakLoader
 
 ## How it works
 Finds CADisplayLink located in UnityAppController, within CADisplayLink there are two relevant strings: PreferredFramesPerSecond & an undocumented int HighFrameRateReason 
