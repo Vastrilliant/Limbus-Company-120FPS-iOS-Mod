@@ -3,22 +3,11 @@
 //
 // Loaded via LiveContainer's TweakLoader.
 //
-// Two things gate the actual frame rate here, and neither is the IL2CPP
-// scripting layer:
-//   - CADisplayLink.preferredFramesPerSecond -- what we ask for. The game
-//     re-applies its own saved setting (60) on loading screens and
-//     whenever the settings screen is touched, so this has to be
-//     continuously re-asserted, not set once.
-//   - CADisplayLink's private `highFrameRateReason` ivar (unsigned int,
-//     default 0) -- an internal gate Apple's CA/ProMotion arbitration
-//     checks before actually honoring a >60Hz request. Unlike
-//     preferredFramesPerSecond, nothing in the game's own code has a
-//     reason to touch this, so once set it stays set.
-//
-// highFrameRateReason is a private scalar ivar, not an object -- so
-// object_getIvar/object_setIvar (which only handle `id`-typed ivars) are
-// the wrong tool here. This uses ivar_getOffset + a direct pointer poke
-// at that byte offset instead.
+// - Continuously re-applies CADisplayLink.preferredFramesPerSecond = 120
+//   and highFrameRateReason = 1 on UnityAppController's display link.
+// - Adds a minimalist on-screen FPS counter, measured via its own
+//   independent CADisplayLink so the number reflects real screen
+//   refreshes, not our polling rate.
 //
 
 #import <Foundation/Foundation.h>
@@ -30,27 +19,24 @@
 #import <string.h>
 #import <stddef.h>
 
-static CADisplayLink *find_display_link(id UnityAppController) {
-    fprintf(stderr, "[fps120] delegate class = %s\n",
-            class_getName([UnityAppController class]));
+#pragma mark - CADisplayLink lookup (frame-rate override)
 
+static CADisplayLink *find_display_link(id appController) {
     CADisplayLink *found = nil;
-    Class cls = [UnityAppController class];
+    Class cls = [appController class];
 
     // class_copyIvarList only returns ivars declared directly on the class
     // passed in -- it does NOT walk superclasses. The delegate's real
     // runtime class is a dynamically generated GUL_UnityAppController-<uuid>
-    // subclass (Google/Firebase's app-delegate swizzler), which adds no
-    // ivars of its own -- CADisplayLink actually lives on UnityAppController,
-    // one level up. So walk the chain ourselves instead of checking one
-    // class only.
+    // subclass (Google/Firebase's app-delegate swizzler); CADisplayLink
+    // actually lives on UnityAppController, one level up. Walk the chain.
     while (cls && !found) {
         unsigned int count = 0;
         Ivar *ivars = class_copyIvarList(cls, &count);
         for (unsigned int i = 0; i < count; i++) {
             const char *type = ivar_getTypeEncoding(ivars[i]);
             if (type && strstr(type, "CADisplayLink")) {
-                id value = object_getIvar(UnityAppController, ivars[i]);
+                id value = object_getIvar(appController, ivars[i]);
                 if ([value isKindOfClass:[CADisplayLink class]]) {
                     found = (CADisplayLink *)value;
                     break;
@@ -64,11 +50,8 @@ static CADisplayLink *find_display_link(id UnityAppController) {
     return found;
 }
 
-
-// Raw ivar access for a scalar (non-object) field. object_getIvar/
-// object_setIvar assume an `id`-sized/typed slot and will read the wrong
-// bytes for something like `unsigned int` -- this instead locates the
-// ivar's byte offset and pokes memory directly, the same way FLEX does.
+// Raw ivar access for a scalar (non-object) field -- object_getIvar/
+// object_setIvar only handle `id`-typed ivars correctly.
 static BOOL uint_ivar_ptr(id obj, const char *name, unsigned int **outPtr) {
     Ivar ivar = class_getInstanceVariable([obj class], name);
     if (!ivar) return NO;
@@ -122,20 +105,114 @@ static void apply_to_link(CADisplayLink *link) {
     }
 }
 
+#pragma mark - On-screen FPS counter
+
+@interface FPS120Counter : NSObject
+@property (nonatomic, strong) UILabel *label;
+@property (nonatomic, strong) CADisplayLink *measureLink;
+@property (nonatomic, assign) CFTimeInterval windowStart;
+@property (nonatomic, assign) NSInteger frameCount;
+- (void)attachToWindow:(UIWindow *)window;
+@end
+
+@implementation FPS120Counter
+
+- (void)attachToWindow:(UIWindow *)window {
+    if (self.label) return; // already attached
+
+    UILabel *label = [[UILabel alloc] init];
+    label.backgroundColor = [UIColor colorWithWhite:0 alpha:0.45];
+    label.textColor = [UIColor colorWithRed:0.35 green:1.0 blue:0.4 alpha:1.0];
+    label.font = [UIFont monospacedDigitSystemFontOfSize:13 weight:UIFontWeightSemibold];
+    label.textAlignment = NSTextAlignmentCenter;
+    label.layer.cornerRadius = 6;
+    label.layer.masksToBounds = YES;
+    label.userInteractionEnabled = NO;
+    label.text = @"-- fps";
+    label.autoresizingMask = UIViewAutoresizingFlexibleRightMargin |
+                              UIViewAutoresizingFlexibleBottomMargin;
+
+    CGFloat top = window.safeAreaInsets.top + 8;
+    CGFloat left = window.safeAreaInsets.left + 8;
+    label.frame = CGRectMake(left, top, 74, 26);
+
+    [window addSubview:label];
+    [window bringSubviewToFront:label];
+    self.label = label;
+
+    CADisplayLink *link = [CADisplayLink displayLinkWithTarget:self selector:@selector(tick:)];
+    link.preferredFrameRateRange = CAFrameRateRangeMake(10, 120, 120);
+    [link addToRunLoop:[NSRunLoop mainRunLoop] forMode:NSRunLoopCommonModes];
+    self.measureLink = link;
+
+    fprintf(stderr, "[fps120] fps counter attached\n");
+}
+
+- (void)tick:(CADisplayLink *)link {
+    if (self.windowStart == 0) {
+        self.windowStart = link.timestamp;
+        return;
+    }
+
+    self.frameCount++;
+    CFTimeInterval elapsed = link.timestamp - self.windowStart;
+
+    if (elapsed >= 0.5) { // update the readout twice a second
+        double fps = self.frameCount / elapsed;
+        self.label.text = [NSString stringWithFormat:@"%.0f fps", fps];
+        self.windowStart = link.timestamp;
+        self.frameCount = 0;
+
+        // Cheap insurance in case the game adds subviews above ours later.
+        [self.label.superview bringSubviewToFront:self.label];
+    }
+}
+
+@end
+
+static FPS120Counter *g_counter = nil;
+
+static UIWindow *find_key_window(void) {
+    for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
+        if ([scene isKindOfClass:[UIWindowScene class]] &&
+            scene.activationState == UISceneActivationStateForegroundActive) {
+            for (UIWindow *window in ((UIWindowScene *)scene).windows) {
+                if (window.isKeyWindow) return window;
+            }
+        }
+    }
+    for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
+        if ([scene isKindOfClass:[UIWindowScene class]]) {
+            NSArray<UIWindow *> *windows = ((UIWindowScene *)scene).windows;
+            if (windows.count > 0) return windows.firstObject;
+        }
+    }
+    return nil;
+}
+
+#pragma mark - Polling loop
+
 static void *poll_and_apply(void *arg) {
     (void)arg;
 
     for (;;) {
         dispatch_async(dispatch_get_main_queue(), ^{
             @autoreleasepool {
-                id UnityAppController = [[UIApplication sharedApplication] delegate];
-                if (UnityAppController) {
-                    CADisplayLink *link = find_display_link(UnityAppController);
-                    apply_to_link(link);
+                id appController = [[UIApplication sharedApplication] delegate];
+                if (appController) {
+                    apply_to_link(find_display_link(appController));
+                }
+
+                if (!g_counter) {
+                    UIWindow *window = find_key_window();
+                    if (window) {
+                        g_counter = [FPS120Counter new];
+                        [g_counter attachToWindow:window];
+                    }
                 }
             }
         });
-        sleep(1);
+        usleep(50 * 1000);
     }
     return NULL;
 }
