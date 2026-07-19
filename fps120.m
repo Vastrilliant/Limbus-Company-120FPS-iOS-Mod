@@ -246,7 +246,7 @@ static BOOL get_high_frame_rate_reason(CADisplayLink *link, unsigned int *outVal
     label.layer.cornerRadius = 6;
     label.layer.masksToBounds = YES;
     label.userInteractionEnabled = NO;
-    label.text = @"-- fps";
+    label.text = @"-- FPS";
     label.autoresizingMask = UIViewAutoresizingFlexibleRightMargin |
                               UIViewAutoresizingFlexibleBottomMargin;
 
