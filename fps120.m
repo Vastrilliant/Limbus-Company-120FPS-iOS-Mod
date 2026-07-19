@@ -212,7 +212,7 @@ static void *poll_and_apply(void *arg) {
                 }
             }
         });
-        usleep(50 * 1000);
+        usleep(1000 * 1000);
     }
     return NULL;
 }
