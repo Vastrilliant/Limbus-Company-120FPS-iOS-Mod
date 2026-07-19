@@ -140,7 +140,8 @@ static BOOL get_high_frame_rate_reason(CADisplayLink *link, unsigned int *outVal
         }
     }
 
-    fprintf(stderr, "[fps120] attached to CADisplayLink %p\n", (void *)link);
+    fprintf(stderr, "[fps120] attached to CADisplayLink %p\n", (__bridge void *)link);
+
 }
 
 - (void)observeValueForKeyPath:(NSString *)keyPath
@@ -218,7 +219,7 @@ static BOOL get_high_frame_rate_reason(CADisplayLink *link, unsigned int *outVal
 
     if (elapsed >= 0.5) {
         double fps = self.frameCount / elapsed;
-        self.label.text = [NSString stringWithFormat:@"%.0f fps", fps];
+        self.label.text = [NSString stringWithFormat:@"%.0f FPS", fps];
         self.windowStart = link.timestamp;
         self.frameCount = 0;
         [self.label.superview bringSubviewToFront:self.label];
