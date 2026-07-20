@@ -1,20 +1,57 @@
-# Limbus-Company-120FPS-iOS-Mod
-Force Limbus to run at 120FPS using CADisplayLink
+# LimbusFPS
 
-.dylib can be found in Actions
+A lightweight jailed iOS tweak that unlocks the frame rate cap in **Limbus Company** on ProMotion devices.
 
-## Requirements 
-1. Decrypted .ipa of LimbusCompany 
-2. Sideloading service that supports .dylib injection or LiveContainer's TweakLoader
+## What it does
+
+Unity's iOS player drives its entire render/update loop directly off a `CADisplayLink` owned by `UnityAppController` 
+This tweak finds that `CADisplayLink` and forces its `preferredFramesPerSecond` to 120, then keeps it there for the life of the session.
+
+## Features
+
+- **Unlocks 120fps** on ProMotion-capable devices (iPhone 13 Pro and later)
+
+- **On-screen FPS counter**, top-left corner, measured independently via its own `CADisplayLink` so the number reflects genuine screen refreshes rather than an assumed value. Updates 5x/second.
+- **Double-tap the counter** to toggle the cap between 120 and 60 on the fly. Text turns orange while the unlock is off, green while it's on.
 
 ## How it works
-Finds CADisplayLink located in UnityAppController, within CADisplayLink there are two relevant strings: PreferredFramesPerSecond & an undocumented int HighFrameRateReason 
 
-The .dylib overrides these values to force the game to run at 120FPS. 
+`UnityAppController` — Unity's standard iOS app delegate class — normally owns the display link directly. If the app also integrates Firebase or Google Mobile Ads, Google's SDK swizzles the delegate at runtime, inserting a dynamically-generated `GUL_UnityAppController-<uuid>` subclass above it. That subclass has no ivars of its own, so the code walks up the class hierarchy from the delegate's *actual* runtime class until it finds an ivar whose type encoding contains `CADisplayLink`, rather than assuming any single fixed class or ivar name.
 
-You'll need to edit the info.plist inside Limbus' app bundle and locate CADisableMinimumFrameDuration and CADisableMinimumFrameDurationOnPhone, both values are set to false by default, you need to set them to true
+Everything else follows from having that object:
+- `preferredFramesPerSecond` is set directly, then watched via `addObserver:forKeyPath:` for any future change
+- A `NSTimer` on the main run loop re-checks the cached value 4x/second as a safety net for the one reset path that KVO can't see
+- The on-screen counter runs a second, independent `CADisplayLink` purely for measurement, decoupled from the one being patched
 
-## Disclaimer 
-Because this will make limbus run at 120 frames at all times, obviously you should not use this if you're playing on Rien's beeper. I will not be held responsible by you nor the Index if your device suffers any damages
+## Requirements
 
-vibecoded using Claude Sonnet 5 Max because I'm a fraud
+- A ProMotion-capable iPhone or iPad (120Hz panel) — without one, there's no higher rate to unlock and this tweak has nothing to do
+- [LiveContainer](https://github.com/LiveContainer/LiveContainer)'s Tweakloader or a sideloading service that allows dylib injection, such as Feather, Plumeimpactor or Sideloadly.
+
+## Building from source
+
+.dylib can be found in thr Actions tab.
+
+To build locally instead, on a Mac with Xcode command line tools:
+
+```bash
+SDK=$(xcrun --sdk iphoneos --show-sdk-path)
+xcrun --sdk iphoneos clang \
+  -arch arm64 -arch arm64e \
+  -dynamiclib \
+  -isysroot "$SDK" \
+  -miphoneos-version-min=15.0 \
+  -fobjc-arc \
+  -framework Foundation \
+  -framework UIKit \
+  -framework QuartzCore \
+  -o LimbusFPS.dylib \
+  fps120.m
+```
+
+
+## Disclaimer
+
+This modifies client-side rendering pacing only (a frame rate cap), no game logic, network traffic, or save data is touched. Provided as-is; use at your own risk and in accordance with the target game's terms of service.
+
+vibecoded with Claude
