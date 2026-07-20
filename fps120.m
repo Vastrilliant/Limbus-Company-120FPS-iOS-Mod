@@ -122,28 +122,42 @@ static CADisplayLink *find_display_link(id appController) {
 
 @implementation FPS120Counter
 
+- (CGSize)fitSizeForText:(NSString *)text {
+    CGSize textSize = [text sizeWithAttributes:@{NSFontAttributeName: self.label.font}];
+    return CGSizeMake(ceil(textSize.width) + 10, ceil(textSize.height) + 4);
+}
+
+- (void)setLabelText:(NSString *)text {
+    self.label.text = text;
+    CGSize size = [self fitSizeForText:text];
+    CGRect frame = self.label.frame;
+    frame.size = size;
+    self.label.frame = frame;
+}
+
 - (void)attachToWindow:(UIWindow *)window {
     if (self.label) return;
 
     UILabel *label = [[UILabel alloc] init];
     label.backgroundColor = [UIColor colorWithWhite:0 alpha:0.45];
     label.textColor = [UIColor colorWithRed:0.35 green:1.0 blue:0.4 alpha:1.0];
-    label.font = [UIFont monospacedDigitSystemFontOfSize:13 weight:UIFontWeightSemibold];
+    label.font = [UIFont monospacedDigitSystemFontOfSize:10 weight:UIFontWeightSemibold];
     label.textAlignment = NSTextAlignmentCenter;
-    label.layer.cornerRadius = 6;
+    label.layer.cornerRadius = 4;
     label.layer.masksToBounds = YES;
     label.userInteractionEnabled = YES;
-    label.text = @"-- FPS";
     label.autoresizingMask = UIViewAutoresizingFlexibleRightMargin |
                               UIViewAutoresizingFlexibleBottomMargin;
 
-    CGFloat top = window.safeAreaInsets.top + 8;
-    CGFloat left = window.safeAreaInsets.left + 8;
-    label.frame = CGRectMake(left, top, 74, 26);
+    CGFloat top = window.safeAreaInsets.top + 6;
+    CGFloat left = window.safeAreaInsets.left + 6;
+    label.frame = CGRectMake(left, top, 0, 0);
 
     [window addSubview:label];
     [window bringSubviewToFront:label];
     self.label = label;
+
+    [self setLabelText:@"--"];
 
     UITapGestureRecognizer *doubleTap = [[UITapGestureRecognizer alloc] initWithTarget:self
                                                                                   action:@selector(handleDoubleTap:)];
@@ -177,7 +191,7 @@ static CADisplayLink *find_display_link(id appController) {
 
     if (elapsed >= 0.2) {
         double fps = self.frameCount / elapsed;
-        self.label.text = [NSString stringWithFormat:@"%.0f FPS", fps];
+        [self setLabelText:[NSString stringWithFormat:@"%.0f", fps]];
         self.windowStart = link.timestamp;
         self.frameCount = 0;
         [self.label.superview bringSubviewToFront:self.label];
@@ -185,6 +199,7 @@ static CADisplayLink *find_display_link(id appController) {
 }
 
 @end
+
 
 static FPS120Counter *g_counter = nil;
 
