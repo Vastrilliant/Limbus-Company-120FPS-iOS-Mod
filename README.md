@@ -11,7 +11,8 @@ This tweak finds that `CADisplayLink` and forces its `preferredFramesPerSecond` 
 
 - **Unlocks 120fps** on ProMotion-capable devices (iPhone 13 Pro and later)
 
-- **On-screen FPS counter**, top-left corner, measured independently via its own `CADisplayLink` so the number reflects genuine screen refreshes rather than an assumed value. Updates 5x/second.
+- **On-screen FPS counter**, top-left corner, measured independently via its own `CADisplayLink`
+  
 - **Double-tap the counter** to toggle the cap between 120 and 60 on the fly. Text turns orange while the unlock is off, green while it's on.
 
 ## How it works
@@ -30,7 +31,7 @@ Everything else follows from having that object:
 
 ## Building from source
 
-.dylib can be found in thr Actions tab.
+.dylib can be found in the Actions tab.
 
 To build locally instead, on a Mac with Xcode command line tools:
 
