@@ -25,9 +25,12 @@ Everything else follows from having that object:
 - The on-screen counter runs a second, independent `CADisplayLink` purely for measurement, decoupled from the one being patched
 
 ## Requirements
+- A decrypted .ipa of LimbusCompany
 
-- A ProMotion-capable iPhone or iPad (120Hz panel) — without one, there's no higher rate to unlock and this tweak has nothing to do
-- [LiveContainer](https://github.com/LiveContainer/LiveContainer)'s Tweakloader or a sideloading service that allows dylib injection, such as Feather, Plumeimpactor or Sideloadly.
+- A ProMotion-capable iDevice
+- [LiveContainer's](https://github.com/LiveContainer/LiveContainer) Tweakloader or a sideloading service that allows dylib injection, such as Feather, Plumeimpactor or Sideloadly.
+
+- You will need to locate `CADisableMinimumFrameDuration` and `CADisableMinimumFrameDurationOnPhone` in info.plist within the .ipa - both are set to false by default, they need to be set to true, otherwise Limbus will be hardcapped to 60 FPS by iOS itself.
 
 ## Building from source
 
