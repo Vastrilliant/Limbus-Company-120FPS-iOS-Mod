@@ -1,4 +1,4 @@
-# LimbusFPS
+# Limbus120FPS-Mod
 
 A lightweight jailed iOS tweak that unlocks the frame rate cap in **Limbus Company** on ProMotion devices.
 
