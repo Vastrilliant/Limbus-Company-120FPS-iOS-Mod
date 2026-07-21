@@ -17,7 +17,7 @@ This tweak finds that `CADisplayLink` and forces its `preferredFramesPerSecond` 
 
 ## How it works
 
-`UnityAppController` — Unity's standard iOS app delegate class — normally owns the display link directly. If the app also integrates Firebase or Google Mobile Ads, Google's SDK swizzles the delegate at runtime, inserting a dynamically-generated `GUL_UnityAppController-<uuid>` subclass above it. That subclass has no ivars of its own, so the code walks up the class hierarchy from the delegate's *actual* runtime class until it finds an ivar whose type encoding contains `CADisplayLink`, rather than assuming any single fixed class or ivar name.
+`UnityAppController` — Unity's standard iOS app delegate class — normally owns the display link directly. If the app also integrates Firebase or Google Mobile Ads, Google's SDK swizzles the delegate at runtime, inserting a dynamically-generated `GUL_UnityAppController-<uuid>` subclass above it. That subclass has no ivars of its own, so the code walks up the class hierarchy from the delegate's actual runtime class until it finds an ivar whose type encoding contains `CADisplayLink`
 
 Everything else follows from having that object:
 - `preferredFramesPerSecond` is set directly, then watched via `addObserver:forKeyPath:` for any future change
@@ -56,6 +56,47 @@ xcrun --sdk iphoneos clang \
 
 ## Disclaimer
 
-This modifies client-side rendering pacing only (a frame rate cap), no game logic, network traffic, or save data is touched. Provided as-is; use at your own risk and in accordance with the target game's terms of service.
+Running the game at this framerate will double the game's  processing overhead, each frame will have to be processed within 8.3ms as opposed to 16.6ms on 60fps. This will signifcantly degrade the game's performance on combat encounters. 
+
+A solution I found is by turning on the boolean `frameBufferOnly` in `UnityView > CAMetalLayer`
+
+```objc
+static UIView *find_unity_view(id appController) {
+    UIView *found = nil;
+    Class cls = [appController class];
+
+    while (cls && !found) {
+        unsigned int count = 0;
+        Ivar *ivars = class_copyIvarList(cls, &count);
+        for (unsigned int i = 0; i < count; i++) {
+            const char *type = ivar_getTypeEncoding(ivars[i]);
+            if (type && strstr(type, "UnityView")) {
+                id value = object_getIvar(appController, ivars[i]);
+                if ([value isKindOfClass:[UIView class]]) {
+                    found = (UIView *)value;
+                    break;
+                }
+            }
+        }
+        free(ivars);
+        cls = class_getSuperclass(cls);
+    }
+    return found;
+}
+
+static void configure_metal_layer(UIView *unityView) {
+    if (!unityView) return;
+    if (![unityView.layer isKindOfClass:[CAMetalLayer class]]) return;
+
+    CAMetalLayer *metalLayer = (CAMetalLayer *)unityView.layer;
+
+    metalLayer.framebufferOnly = YES;
+
+}
+```
+
+According to Apple's CAMetal API documentation, `frameBufferOnly` is meant to save memory by only processing textures exclusively for rendering. Limbus disables this value for its post-processing (Bloom and Blur). Enabling this value will eliminate the post-processing overhead, increasing performance.
+
+120 FPS and other higher framerates are freely available on desktops using the 'Auto' Framerate setting. This .dylib does NOT provide any sort of game advantage such as speeding up the game. Although it's always best to be careful; provided as-is, use at your own risk. I will not be held responsible for any liabilities.
 
 vibecoded with Claude
