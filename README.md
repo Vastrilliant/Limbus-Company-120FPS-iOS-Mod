@@ -7,17 +7,9 @@ A lightweight jailed iOS tweak that unlocks the frame rate cap in **Limbus Compa
 Unity's iOS player drives its entire render/update loop directly off a `CADisplayLink` owned by `UnityAppController` 
 This tweak finds that `CADisplayLink` and forces its `preferredFramesPerSecond` to 120, then keeps it there for the life of the session.
 
-## Features
-
-- **Unlocks 120fps** on ProMotion-capable devices (iPhone 13 Pro and later)
-
-- **On-screen FPS counter**, top-left corner, measured independently via its own `CADisplayLink`
-  
-- **Double-tap the counter** to toggle the cap between 120 and 60 on the fly. Text turns orange while the unlock is off, green while it's on.
-
 ## How it works
 
-`UnityAppController` — Unity's standard iOS app delegate class — normally owns the display link directly. If the app also integrates Firebase or Google Mobile Ads, Google's SDK swizzles the delegate at runtime, inserting a dynamically-generated `GUL_UnityAppController-<uuid>` subclass above it. That subclass has no ivars of its own, so the code walks up the class hierarchy from the delegate's actual runtime class until it finds an ivar whose type encoding contains `CADisplayLink`
+`UnityAppController` — Unity's standard iOS app delegate class l normally owns the display link directly. If the app also integrates Firebase or Google Mobile Ads, Google's SDK swizzles the delegate at runtime, inserting a dynamically-generated `GUL_UnityAppController-<uuid>` subclass above it. That subclass has no ivars of its own, so the code walks up the class hierarchy from the delegate's actual runtime class until it finds an ivar whose type encoding contains `CADisplayLink`
 
 Everything else follows from having that object:
 - `preferredFramesPerSecond` is set directly, then watched via `addObserver:forKeyPath:` for any future change
@@ -54,7 +46,7 @@ xcrun --sdk iphoneos clang \
 ```
 
 
-## Disclaimer
+## Disclaimers & Other stuff
 
 Running the game at this framerate will double the game's  processing overhead, each frame will have to be processed within 8.3ms as opposed to 16.6ms on 60fps. This will signifcantly degrade the game's performance on combat encounters. 
 
