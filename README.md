@@ -13,8 +13,7 @@ This tweak finds that `CADisplayLink` and forces its `preferredFramesPerSecond` 
 
 Everything else follows from having that object:
 - `preferredFramesPerSecond` is set directly, then watched via `addObserver:forKeyPath:` for any future change
-- A `NSTimer` on the main run loop re-checks the cached value 4x/second as a safety net for the one reset path that KVO can't see
-- The on-screen counter runs a second, independent `CADisplayLink` purely for measurement, decoupled from the one being patched
+- A `NSTimer` on the main run loop re-checks the cached value every second as a safety net for the one reset path that KVO can't see
 
 ## Requirements
 - A decrypted .ipa of LimbusCompany
